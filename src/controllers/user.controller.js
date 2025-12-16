@@ -209,7 +209,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     if (incomingRefreshToken !== user.refreshToken) {
         throw new APIError(401, "refreshAccessToken expired")
     }
- // genreate tokens again 
+    // genreate tokens again 
     const { accessToken, newrefeshToken } = generateAccesandRefreshTokens(user._id)
 
     const options = {
@@ -222,9 +222,79 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
         .json(
             new ApiResponse(200, { accessToken, refreshToken: newrefeshToken }, "acess token refreshed")
         )
+})
+
+
+
+// change currentPassword
+
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+
+    const { oldPassword, newPassword } = req.body
+
+    const user = await User.findById(req.user?._id)
+
+    const isPasswordCorrect = user.isPasswordCorrect(oldPassword)
+
+    if (!isPasswordCorrect) {
+        throw new APIError(400, "invalid old Password")
+    }
+
+    user.password = newPassword
+    await user.save({ validateBeforeSave: false })
+
+    return res.status(200).json(
+        new ApiResponse(200, {}, " Password is changed successfully")
+    )
 
 })
 
 
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+//getCurrentUser
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+    return res.status(200)
+        .json(new ApiResponse(200, req.user, "user fatched succesfully"))
+
+})
+
+
+//updateAccountDetails
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
+    const { email, fullName, } = req.body
+
+    if (!email && !fullName)
+        throw new APIError(400, "required all feilds")
+
+    const user = await User.findByIdAndUpdate(req.user?._id,
+        {
+            $set: {
+                fullName,
+                email: email
+            }
+        },
+        { new: true }
+    ).select("-password")
+
+    return res.status(200)
+        .json(new ApiResponse(200, user, "Account details updated successfully"))
+})
+
+
+
+
+
+
+
+
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser,
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser
+};
