@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import JWT from 'jsonwebtoken'
+import { subscription } from "../models/subscription.model.js";
 
 
 
@@ -285,6 +286,148 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 
 
 
+  // update avatar
+  const updateAvatar = asyncHandler (async(req, res) => {
+            const avatarLocalPath = req.files?.path  // files path
+            
+            if (!avatarLocalPath) {
+                throw new APIError(400, "avatar file is missing")
+            }
+            
+       const avatar   = await uploadOnCloudinary(avatarLocalPath)
+
+       if(!avatar?.length){
+        throw new APIError (400, "avatar does not uploded on uploadOnCloudinary", error)
+       }
+
+       // findbyupdate
+        User.findByIdAndUpdate(req.user._id,
+            {
+                $set:{
+                    avatar:avatar
+                }
+            },
+               
+                {new: true}
+        ).select("-password")
+
+        return res.status(200)
+        .json(new ApiResponse(200,{}, "avatar fetched succesfully"))
+
+  })
+
+
+
+  const updatecoverImage = asyncHandler (async(req, res) => {
+            const coverImageLocalPath = req.files?.path  // files path
+            
+            if (!coverImageLocalPath) {
+                throw new APIError(400, "coverimage file is missing")
+            }
+            
+       const coverImage   = await uploadOnCloudinary(coverImageLocalPath)
+
+       if(!coverImage?.length){
+        throw new APIError (400, "coverImage does not uploded on uploadOnCloudinary", error)
+       }
+
+       // findbyupdate
+        User.findByIdAndUpdate(req.user._id,
+            {
+                $set:{
+                    coverImage:coverImage
+                }
+            },
+               
+                {new: true}
+        ).select("-password")
+
+        return res.status(200)
+        .json(new ApiResponse(200,{}, "coverimage fetched succesfully"))
+
+  })
+
+
+
+  //subscriptionSchema
+   
+  const getChannelprofile = asyncHandler (async(req, res)=>{
+          
+    const {username} = req.params
+    if (!username?.trim()) {
+        throw new APIError(400, "username is missing")
+    }
+       
+
+
+
+    
+    // aggregate function usee
+    const channel    = await User.aggregate([
+        {
+            $match:{                             // 1.pipeline
+                username: username
+            }
+            
+        },
+                {
+                    $lookup:{
+                        from:"subscription",                  // count subscriber
+                        localField: "_id",
+                        foreignField: "$channel",
+                        as:"subscribers"
+                    }
+                },
+
+                {
+                    $lookup:{                               // kudki chnnel hai usne dusari chhnel ko subscribe kiya hai vo
+                        from:"subscription",
+                        localField: "_id",
+                        foreignField: "$subscriber",
+                        as:"subscribedto"
+                    }
+                },
+
+                {
+                    $addFields:{
+                        subscribercount:{                    // count subscriber
+                         $size:"subscribers"
+                        },
+                        channelsubscriptiontocount:{           // to
+                            $size:"subscribedto"
+                        },
+                        issubscribed:{                       // is that subscribed or not?
+                          $cond:{
+                            if:{$in :[req.user?._id,"$subsribers.subscriber"]},
+                            then:true,
+                            else: false
+                          }
+                        }
+                    }
+                },
+                {
+                    $project: {
+                        username: 1,
+                        fullName: 1,
+                        avatar: 1,
+                        coverImage: 1,
+                        subscribercount: 1,
+                        channelsubscriptiontocount: 1,
+                        issubscribed: 1
+                    }
+                }
+
+        ])
+
+        if (!channel?.length) {
+            throw new APIError(404, "channel does not exist")
+        }
+
+        return res.status(200)
+            .json(new ApiResponse(200, channel[0], "channel profile fetched successfully"))
+ 
+})
+
 
 
 
@@ -296,5 +439,9 @@ export {
     logoutUser,
     refreshAccessToken,
     changeCurrentPassword,
-    getCurrentUser
+    getCurrentUser,
+    updateAccountDetails,
+    updateAvatar,
+    updatecoverImage,
+    getChannelprofile
 };
